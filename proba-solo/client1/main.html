@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <link rel="stylesheet" href="/assets/styles/style.css"> -->
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <title>Пробую свое</title>
+</head>
+<body>
+    <div class="main" id="root">
+        <h1>
+            Пробую свое
+        </h1>
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+    </div>
+
+    <script type="module">
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Класс Game
+        class Game {
+            isPlaying = true;
+            score = 0;
+            lines = 0;
+            level = 0;
+            playfield = [
+                [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [2, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0],
+                [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0],
+                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0, 2, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 2, 2, 2, 2, 2, 2],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 0, 2],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0]
+            ];
+            static colors = {
+                '1': 'cyan',
+                '2': 'blue',
+                '3': 'orange',
+                '4': 'yellow',
+                '5': 'green',
+                '6': 'purple',
+                '7': 'red',
+            };
+            player = {
+                x: 18,
+                y: 19,
+                blocks: [
+                    [6] // Изменил значение блока для отображения цвета
+                ],
+            };
+
+            playerMoveCallback = null;
+
+            onPlayerMove(callback) {
+                this.playerMoveCallback = callback;
+            }
+
+            moveLeft() {
+                this.player.x -= 1;
+                this.draw();
+
+                if (this.hasCollision()) {
+                    this.player.x += 1;
+                    this.draw();
+                }
+                this.emitPlayerMove();
+            }
+
+            moveRight() {
+                this.player.x += 1;
+                this.draw();
+
+                if (this.hasCollision()) {
+                    this.player.x -= 1;
+                    this.draw();
+                }
+                this.emitPlayerMove();
+            }
+
+            moveDown() {
+                this.player.y += 1;
+                this.draw();
+
+                if (this.hasCollision()) {
+                    this.player.y -= 1;
+                    this.draw();
+                }
+                this.emitPlayerMove();
+            }
+
+            moveUp() {
+                this.player.y -= 1;
+                this.draw();
+
+                if (this.hasCollision()) {
+                    this.player.y += 1;
+                    this.draw();
+                }
+                this.emitPlayerMove();
+            }
+
+            emitPlayerMove() {
+                if (this.playerMoveCallback) {
+                    this.playerMoveCallback({ x: this.player.x, y: this.player.y });
+                    this.draw();
+                }
+            }
+
+            hasCollision() {
+                const { y: pieceY, x: pieceX, blocks } = this.player;
+
+                for (let y = 0; y < blocks.length; y++) {
+                    for (let x = 0; x < blocks[y].length; x++) {
+                        if (blocks[y][x] &&
+                            ((this.playfield[pieceY + y] === undefined || this.playfield[pieceY + y][pieceX + x] === undefined) ||
+                            this.playfield[pieceY + y][pieceX + x])
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            drawBlock(x, y, color) {
+                ctx.fillStyle = color;
+                ctx.fillRect(x * 20, y * 20, 20, 20);
+            }
+            
+            startPlayerMoveInterval() {
+                this.playerMoveInterval = setInterval(() => {
+                        this.emitPlayerMove();
+                }, 1000);
+            }
+
+        
+
+            draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (let y = 0; y < this.playfield.length; y++) {
+                    for (let x = 0; x < this.playfield[y].length; x++) {
+                        if (this.playfield[y][x]) {
+                            const color = Game.colors[this.playfield[y][x]]; // Используем цвета из статического свойства
+                            this.drawBlock(x, y, color);
+                        }
+                    }
+                }
+
+                const { x: playerX, y: playerY, blocks } = this.player;
+                for (let y = 0; y < blocks.length; y++) {
+                    for (let x = 0; x < blocks[y].length; x++) {
+                        if (blocks[y][x]) {
+                            const color = Game.colors[blocks[y][x]]; // Используем цвета из статического свойства
+                            this.drawBlock(playerX + x, playerY + y, color);
+                        }
+                    }
+                }
+            }
+
+
+            handleKeyDown(event) {
+                switch(event.key) {
+                    case 'ArrowLeft':
+                        if (this.isPlaying) { 
+                            this.moveLeft();
+                        }
+                        break;
+                    case 'ArrowUp':
+                        if (this.isPlaying) { 
+                            this.moveUp(); 
+                        }
+                        break;
+                    case 'ArrowRight':
+                        if (this.isPlaying) { 
+                            this.moveRight();
+                        }
+                        break;
+                    case 'ArrowDown':
+                        if (this.isPlaying) { 
+                            this.moveDown();
+                        }
+                        break;
+                }
+            }
+        }
+
+        // Класс Client
+        class Client {
+            constructor(gameInstance) {
+                this.socket = io('http://localhost:3000');
+                this.game = gameInstance;
+
+                this.game.onPlayerMove((playerCoordinates) => {
+                    this.socket.emit('clientData', { type: 'playerMove', coordinates: playerCoordinates });
+                });
+                this.socket.on('serverData', (result) => {
+                    console.log('Получен результат от сервера:', result);
+                    this.game.drawBlock(result.coordinates.x, result.coordinates.y, 'red');
+                });
+            }
+        }
+
+        const game = new Game();
+        const client = new Client(game);
+        game.startPlayerMoveInterval();
+        window.addEventListener("keydown", (event) => {
+            game.handleKeyDown(event);
+        });
+
+        canvas.focus();
+
+        window.addEventListener("DOMContentLoaded", () => {
+            game.draw();
+        });
+    </script>
+</body>
+</html>

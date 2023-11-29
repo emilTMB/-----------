@@ -1,0 +1,17 @@
+body {
+    margin: 0;
+    background-color: rgb(255, 255, 255);
+}
+
+.main {
+    padding: 3rem;
+    text-align: center;
+}
+
+.main h1 {
+    color: white;
+}
+.main canvas {
+    display: block;
+    margin: 0 auto;
+}
